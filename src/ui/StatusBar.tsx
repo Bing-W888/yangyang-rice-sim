@@ -1,4 +1,3 @@
-import { SOLAR_SYSTEM, ORP_SYSTEM } from '../data/projectData'
 import type { ControlState } from '../simulation/orpControl'
 
 interface StatusBarProps {
@@ -53,9 +52,9 @@ export function StatusBar({
           <span className="dot" />
           {stateLabels[controlState]}
         </div>
-        <div className="status-chip active">
-          <span className="dot" />
-          碳效益: {carbonBenefit.toFixed(2)} tCO₂e
+        <div className="carbon-badge">
+          <span className="badge-icon">CO₂</span>
+          {carbonBenefit.toFixed(2)} tCO₂e
         </div>
       </div>
     </div>

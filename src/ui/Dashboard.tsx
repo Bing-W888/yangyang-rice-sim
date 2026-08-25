@@ -21,10 +21,14 @@ export function Dashboard({
   const controlAction = getControlAction(controlState)
   const orpPercent = Math.max(0, Math.min(100, ((orpValue + 300) / 450) * 100))
   const orpColor = orpValue < -200 ? '#ef4444' : orpValue < -100 ? '#f59e0b' : orpValue < 50 ? '#22c55e' : '#06b6d4'
+  const orpZoneClass = orpValue < -200 ? 'severe' : orpValue < -100 ? 'warning' : orpValue < 50 ? 'optimal' : 'excess'
+  const orpZoneLabel = orpValue < -200 ? '严重缺氧' : orpValue < -100 ? '轻度缺氧' : orpValue < 50 ? '适宜' : '过氧化'
+
+  const stateKeys: ControlState[] = ['force_run', 'intermittent', 'low_freq', 'stop']
 
   return (
     <div className="side-panel">
-      {/* 实时监测数据 */}
+      {/* Real-time monitoring */}
       <div className="panel-section">
         <h3>实时监测数据</h3>
         <div className="metric-grid">
@@ -46,7 +50,7 @@ export function Dashboard({
           </div>
         </div>
 
-        {/* ORP色谱条 */}
+        {/* ORP spectrum bar */}
         <div className="orp-bar-container">
           <div className="orp-bar">
             <div className="threshold-mark" style={{ left: '22.2%' }} />
@@ -62,9 +66,12 @@ export function Dashboard({
             <span>+150</span>
           </div>
         </div>
+        <div className={`orp-zone ${orpZoneClass}`} style={{ marginTop: '4px', display: 'inline-flex' }}>
+          <span>当前状态: {orpZoneLabel}</span>
+        </div>
       </div>
 
-      {/* 控制策略 */}
+      {/* Control strategy */}
       <div className="panel-section">
         <h3>ORP阈值控制策略</h3>
         <div style={{ background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '10px 12px', border: `1px solid ${orpColor}` }}>
@@ -81,7 +88,7 @@ export function Dashboard({
           </thead>
           <tbody>
             {ORP_DATA.thresholds.map((t, i) => (
-              <tr key={i} style={{ background: controlState === ['force_run','intermittent','low_freq','stop'][i] ? 'rgba(56,189,248,0.05)' : 'transparent' }}>
+              <tr key={i} style={{ background: controlState === stateKeys[i] ? 'rgba(56,189,248,0.05)' : 'transparent' }}>
                 <td style={{ fontFamily: 'monospace', fontSize: '10px' }}>{t.range}</td>
                 <td style={{ fontSize: '10px' }}>{t.status}</td>
                 <td style={{ fontSize: '10px' }}>{t.action}</td>
@@ -91,7 +98,7 @@ export function Dashboard({
         </table>
       </div>
 
-      {/* 太阳能供电状态 */}
+      {/* Solar power status */}
       <div className="panel-section">
         <h3>太阳能供电状态</h3>
         <div className="metric-grid">
@@ -130,7 +137,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* 碳汇核算 */}
+      {/* Carbon accounting */}
       <div className="panel-section">
         <h3>碳汇核算</h3>
         <div className="metric-grid">
@@ -156,7 +163,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* 系统参数 */}
+      {/* Bubble system params */}
       <div className="panel-section">
         <h3>气泡系统参数</h3>
         <div className="module-info">
@@ -187,7 +194,7 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* 预算概览 */}
+      {/* Budget overview */}
       <div className="panel-section">
         <h3>项目预算概览</h3>
         <table className="data-table">
@@ -205,7 +212,7 @@ export function Dashboard({
         </table>
       </div>
 
-      {/* 实施进度 */}
+      {/* Timeline */}
       <div className="panel-section">
         <h3>实施时间线</h3>
         {TIMELINE.map((t, i) => (
