@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'react'
 import { Scene } from './components/Scene'
 import { StatusBar } from './ui/StatusBar'
 import { Dashboard } from './ui/Dashboard'
@@ -89,6 +89,9 @@ export default function App() {
   const [chartCollapsed, setChartCollapsed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeModule, setActiveModule] = useState<string>('overview')
+  const [paramCollapsed, setParamCollapsed] = useState(false)
+  const [bubbleOverride, setBubbleOverride] = useState<'auto' | 'on' | 'off'>('auto')
+  const [isScrubbing, setIsScrubbing] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1500)
@@ -96,12 +99,12 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!isRunning) return
+    if (!isRunning || isScrubbing) return
     const interval = setInterval(() => {
       setSimStep(prev => (prev + 1 >= totalSteps ? 0 : prev + 1))
     }, 100)
     return () => clearInterval(interval)
-  }, [isRunning])
+  }, [isRunning, isScrubbing])
 
   const currentData = FULL_DAY_DATA[Math.min(simStep, totalSteps - 1)]
   const solarData = FULL_SOLAR_DATA[Math.min(simStep, totalSteps - 1)]
@@ -110,7 +113,8 @@ export default function App() {
   const doValue = currentData?.do ?? 3.5
   const temperature = currentData?.temperature ?? 25
   const waterLevel = currentData?.waterLevel ?? 5
-  const bubbleActive = currentData?.bubbleActive ?? false
+  const autoBubble = currentData?.bubbleActive ?? false
+  const bubbleActive = bubbleOverride === 'auto' ? autoBubble : bubbleOverride === 'on'
   const batterySOC = solarData?.batterySOC ?? 80
   const pvOutput = solarData?.pvOutput ?? 0
   const controlState: ControlState = getControlState(orpValue)
@@ -122,6 +126,16 @@ export default function App() {
   const handleReset = useCallback(() => setSimStep(0), [])
   const handleToggleRun = useCallback(() => setIsRunning(prev => !prev), [])
   const handleModuleClick = useCallback((m: string) => setActiveModule(m), [])
+  const handleTimelineChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const val = parseInt(e.target.value)
+    setSimStep(val)
+  }, [])
+  const handleTimelineMouseDown = useCallback(() => setIsScrubbing(true), [])
+  const handleTimelineMouseUp = useCallback(() => setIsScrubbing(false), [])
+  const handleTimeSlider = useCallback((hour: number) => {
+    const step = Math.round((hour / 24) * totalSteps)
+    setSimStep(step)
+  }, [])
 
   if (loading) {
     return (
@@ -148,8 +162,140 @@ export default function App() {
         <Scene
           bubbleActive={bubbleActive} orpValue={orpValue} doValue={doValue}
           growthStage={growthStage} sunIntensity={sunIntensity}
+          batterySOC={batterySOC} pvOutput={pvOutput} temperature={temperature}
           onModuleClick={handleModuleClick}
         />
+
+        {/* Parameter Control Panel */}
+        <div className={`param-panel ${paramCollapsed ? 'collapsed' : ''}`}>
+          <div className="panel-header" onClick={() => setParamCollapsed(prev => !prev)}>
+            <span>参数调节</span>
+            <span className="collapse-arrow">▼</span>
+          </div>
+          <div className="panel-body">
+            <div className="param-group">
+              <div className="param-label">
+                <span>仿真时刻</span>
+                <span className="param-value">{simulationHour.toFixed(1)}h</span>
+              </div>
+              <input
+                type="range" className="param-slider" min={0} max={24} step={0.1}
+                value={simulationHour}
+                onChange={(e) => handleTimeSlider(parseFloat(e.target.value))}
+                onMouseDown={handleTimelineMouseDown}
+                onMouseUp={handleTimelineMouseUp}
+              />
+            </div>
+            <div className="param-group">
+              <div className="param-label">
+                <span>气泡系统模式</span>
+              </div>
+              <div className="param-toggle-row">
+                <button
+                  className={`param-toggle-btn ${bubbleOverride === 'auto' ? 'active' : ''}`}
+                  onClick={() => setBubbleOverride('auto')}
+                >自动</button>
+                <button
+                  className={`param-toggle-btn ${bubbleOverride === 'on' ? 'active' : ''}`}
+                  onClick={() => setBubbleOverride('on')}
+                >强制开启</button>
+                <button
+                  className={`param-toggle-btn ${bubbleOverride === 'off' ? 'active' : ''}`}
+                  onClick={() => setBubbleOverride('off')}
+                >关闭</button>
+              </div>
+            </div>
+            <div className="param-group">
+              <div className="param-label">
+                <span>生长阶段</span>
+              </div>
+              <div className="param-toggle-row">
+                {(['tillering', 'jointing', 'heading', 'mature'] as GrowthStage[]).map(stage => (
+                  <button
+                    key={stage}
+                    className={`param-toggle-btn ${growthStage === stage ? 'active' : ''}`}
+                    onClick={() => setGrowthStage(stage)}
+                  >
+                    {stage === 'tillering' ? '分蘖' : stage === 'jointing' ? '拔节' : stage === 'heading' ? '抽穗' : '成熟'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Real-time Data HUD */}
+        <div className="data-hud">
+          <div className="hud-card orp">
+            <div className="hud-label">ORP 氧化还原电位</div>
+            <div className="hud-value">
+              <span className="val">{orpValue.toFixed(0)}</span>
+              <span className="unit">mV</span>
+            </div>
+            <div className="hud-bar">
+              <div className="hud-bar-fill" style={{ width: `${Math.min(100, Math.abs(orpValue) / 3)}%` }} />
+            </div>
+          </div>
+          <div className="hud-card do">
+            <div className="hud-label">DO 溶解氧</div>
+            <div className="hud-value">
+              <span className="val">{doValue.toFixed(1)}</span>
+              <span className="unit">mg/L</span>
+            </div>
+            <div className="hud-bar">
+              <div className="hud-bar-fill" style={{ width: `${Math.min(100, (doValue / 8) * 100)}%` }} />
+            </div>
+          </div>
+          <div className="hud-card solar">
+            <div className="hud-label">光伏发电</div>
+            <div className="hud-value">
+              <span className="val">{pvOutput.toFixed(0)}</span>
+              <span className="unit">W</span>
+            </div>
+            <div className="hud-bar">
+              <div className="hud-bar-fill" style={{ width: `${Math.min(100, (pvOutput / 1100) * 100)}%` }} />
+            </div>
+          </div>
+          <div className="hud-card bubble">
+            <div className="hud-label">气泡系统</div>
+            <div className="hud-value">
+              <span className="val" style={{ color: bubbleActive ? '#06b6d4' : '#64748b' }}>{bubbleActive ? '运行' : '待机'}</span>
+            </div>
+            <div className="hud-bar">
+              <div className="hud-bar-fill" style={{ width: bubbleActive ? '100%' : '0%', opacity: bubbleActive ? 1 : 0.3 }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Timeline Scrubber */}
+        <div className="timeline-bar">
+          <div className="timeline-header">
+            <span>24小时仿真时间轴</span>
+            <span className="time-display">{simulationHour.toFixed(1)}h / 24h</span>
+          </div>
+          <div className="timeline-track">
+            <div className="timeline-fill" style={{ width: `${(simStep / totalSteps) * 100}%` }} />
+            <div className="timeline-handle" style={{ left: `${(simStep / totalSteps) * 100}%` }} />
+            <input
+              type="range"
+              min={0}
+              max={totalSteps - 1}
+              value={simStep}
+              onChange={handleTimelineChange}
+              onMouseDown={handleTimelineMouseDown}
+              onMouseUp={handleTimelineMouseUp}
+              onTouchStart={handleTimelineMouseDown}
+              onTouchEnd={handleTimelineMouseUp}
+              style={{
+                position: 'absolute', top: 0, left: 0, width: '100%',
+                height: '100%', opacity: 0, cursor: 'pointer', margin: 0,
+              }}
+            />
+          </div>
+          <div className="timeline-ticks">
+            <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
+          </div>
+        </div>
 
         {/* Scene info overlay */}
         <div className="scene-overlay">
